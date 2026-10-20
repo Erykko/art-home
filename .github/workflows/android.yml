@@ -40,10 +40,11 @@ jobs:
           java-version: "17"
           distribution: temurin
 
-      - uses: android-actions/setup-android@v3
-
       - name: Install Android build tools and platform
-        run: sdkmanager "build-tools;${BUILD_TOOLS}" "platforms;${PLATFORM}"
+        # GitHub's Ubuntu runners ship the Android SDK; just make sure these packages are present.
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;${BUILD_TOOLS}" "platforms;${PLATFORM}" > /dev/null
 
       - name: Build (debug key)
         run: |
@@ -72,11 +73,10 @@ jobs:
           java-version: "17"
           distribution: temurin
 
-      - uses: android-actions/setup-android@v3
-
       - name: Install Android build tools, platform and bundletool
         run: |
-          sdkmanager "build-tools;${BUILD_TOOLS}" "platforms;${PLATFORM}"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;${BUILD_TOOLS}" "platforms;${PLATFORM}" > /dev/null
           curl -sL -o "$RUNNER_TEMP/bundletool.jar" \
             https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
 
