@@ -11,6 +11,12 @@ home can't show artwork behind its rows, but it works on most Android TV devices
 > Screenshots use public-domain paintings from the
 > [Art Institute of Chicago](https://www.artic.edu/open-access) open-access collection.
 
+## Download
+
+**[⬇ Download the latest APK](https://github.com/Erykko/art-home/releases/latest)** — then follow
+[Install the APK](#install-the-apk-sideload). Out of the box it shows public-domain paintings from
+the Art Institute of Chicago and The Met (downloaded on first launch).
+
 ---
 
 ## Contents
@@ -29,7 +35,8 @@ home can't show artwork behind its rows, but it works on most Android TV devices
   - [Updating without a computer](#updating-without-a-computer)
 - [Settings reference](#settings-reference)
 - [Remote control](#remote-control)
-- [Building and installing](#building-and-installing)
+- [Install the APK (sideload)](#install-the-apk-sideload)
+- [Building from source](#building-from-source)
 - [TCL / Google TV specifics](#tcl--google-tv-specifics)
 - [Optional: capturing NXTFRAME artwork](#optional-capturing-nxtframe-artwork)
 - [Privacy and network use](#privacy-and-network-use)
@@ -127,7 +134,7 @@ When Spotify, YouTube or any app is playing in the background, a card appears un
   (controls hide until you press a key).
 
   ![Music mode while idle](docs/screenshots/music-mode.png)
-- It needs notification access (granted once over ADB; see [installing](#building-and-installing)).
+- It needs notification access (granted once over ADB; see [installing](#install-the-apk-sideload)).
 
 ### Apps, All Apps and search
 
@@ -232,9 +239,56 @@ Open with the **Settings** button on the home screen.
 
 ---
 
-## Building and installing
+## Install the APK (sideload)
+
+1. On the TV: **Settings → System → About → Android TV OS build** — press OK 7 times to unlock
+   Developer options, then turn on **USB debugging** (and **Wireless debugging** if offered).
+2. On a computer with [ADB](https://developer.android.com/tools/releases/platform-tools)
+   (`TV` is the TV's IP address and port, shown under Wireless debugging or Network settings):
+
+   ```bash
+   export TV=192.168.1.50:5555
+   adb connect $TV                     # accept the prompt on the TV
+   adb -s $TV push ArtHome-6.22.apk /data/local/tmp/ArtHome.apk
+   adb -s $TV shell pm install -i com.android.vending -r /data/local/tmp/ArtHome.apk
+   ```
+
+3. Make the **Home button** open Art Home (Google TV ignores the normal default-home setting):
+
+   ```bash
+   adb -s $TV shell settings put secure enabled_accessibility_services app.arthome/app.arthome.HomeRedirectService
+   adb -s $TV shell settings put secure accessibility_enabled 1
+   ```
+
+4. Optional extras:
+
+   ```bash
+   # Now playing card
+   adb -s $TV shell cmd notification allow_listener app.arthome/app.arthome.MediaListener
+   # "Recently used" in All Apps
+   adb -s $TV shell cmd appops set app.arthome GET_USAGE_STATS allow
+   # Update Art Home later from your phone
+   adb -s $TV shell cmd appops set app.arthome REQUEST_INSTALL_PACKAGES allow
+   # TCL TVs only: let the Home-button service start after a reboot
+   adb -s $TV shell cmd appops set app.arthome AUTO_START allow
+   adb -s $TV shell cmd appops write-settings
+   ```
+
+5. Press **Home**. Until step 3 is done, Art Home shows a red note reminding you.
+
+To remove it: `adb -s $TV uninstall app.arthome`.
+
+The release APK uses the package name `app.arthome` and is signed with the project's release
+key. Builds from source (below) use `com.eric.artlauncher` and your own debug key, so the two
+install side by side rather than replacing each other.
+
+---
+
+## Building from source
 
 No Gradle: the APK is built straight from the Android SDK command-line tools.
+`build_release.sh` produces the public release (neutral package name, release key, checks that
+no personal strings are inside).
 
 **Requirements:** Android SDK with `build-tools` 36.1.0 and `platforms/android-34`, JDK 17,
 a debug keystore at `~/.android/debug.keystore`.

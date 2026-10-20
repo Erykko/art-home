@@ -4,3 +4,4 @@ build/
 *.err
 *.apk
 !docs/**/*.apk
+release/

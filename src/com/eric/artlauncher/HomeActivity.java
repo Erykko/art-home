@@ -447,8 +447,14 @@ public class HomeActivity extends Activity {
         // Give the service a few seconds after boot or an update before warning.
         handler.postDelayed(() -> {
             if (HomeRedirectService.connected) return;
-            warning.setText("The Home button can't open Art Home right now: TCL turned off its "
-                    + "background permission. Restart the TV to fix it.");
+            String enabled = android.provider.Settings.Secure.getString(getContentResolver(),
+                    android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            boolean switchedOn = enabled != null && enabled.contains(getPackageName());
+            warning.setText(switchedOn
+                    ? "The Home button can't open Art Home right now: the TV turned off its "
+                    + "background permission. Restart the TV to fix it."
+                    : "To make the Home button open Art Home, turn on its service once "
+                    + "(see the setup steps on the project page).");
             warning.setVisibility(View.VISIBLE);
         }, 5000);
     }
@@ -484,7 +490,8 @@ public class HomeActivity extends Activity {
     private void refreshPacksIfEmpty() {
         if (packDownloadRunning) return;
         final List<String> todo = new ArrayList<>();
-        for (String s : new String[]{Prefs.SOURCE_MET, Prefs.SOURCE_AIC}) {
+        // Art Institute first: its API is much faster, so art appears sooner on first run.
+        for (String s : new String[]{Prefs.SOURCE_AIC, Prefs.SOURCE_MET}) {
             if (prefs.sources().contains(s) && ArtPacks.isEmpty(this, s)) todo.add(s);
         }
         if (todo.isEmpty()) return;
@@ -495,6 +502,7 @@ public class HomeActivity extends Activity {
                     ArtPacks.download(this, s, null);
                 } catch (Exception ignored) {
                 }
+                handler.post(this::loadArtList); // show each pack as soon as it's ready
             }
             packDownloadRunning = false;
             handler.post(this::loadArtList);
@@ -545,8 +553,38 @@ public class HomeActivity extends Activity {
         }).start();
     }
 
+    private TextView emptyNote;
+    private final Runnable retryArt = () -> {
+        loadArtList();
+        showNextArt();
+    };
+
+    /** First run: museum packs are still downloading, or no source has pictures yet. */
+    private void updateEmptyNote() {
+        if (emptyNote == null) {
+            emptyNote = new TextView(this);
+            styleText(emptyNote, 18, 0xCCFFFFFF);
+            emptyNote.setGravity(Gravity.CENTER);
+            ((FrameLayout) overlay).addView(emptyNote, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        }
+        boolean empty = artFiles.isEmpty();
+        emptyNote.setVisibility(empty ? View.VISIBLE : View.GONE);
+        if (empty) {
+            emptyNote.setText(packDownloadRunning || ArtSources.albumNeedsRefresh(prefs)
+                    ? "Downloading artwork…"
+                    : "No artwork yet. Choose sources in Settings.");
+        }
+    }
+
     private void showNextArt() {
-        if (artFiles.isEmpty()) return;
+        updateEmptyNote();
+        if (artFiles.isEmpty()) {
+            // Check again soon (e.g. while museum art downloads).
+            handler.removeCallbacks(retryArt);
+            handler.postDelayed(retryArt, 3000);
+            return;
+        }
         int idx;
         if (prefs.shuffle()) {
             idx = random.nextInt(artFiles.size());

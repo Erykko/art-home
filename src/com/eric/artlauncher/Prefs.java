@@ -52,7 +52,8 @@ public final class Prefs {
     public void setShowTitle(boolean v) { sp.edit().putBoolean("show_title", v).apply(); }
 
     public Set<String> sources() {
-        return new HashSet<>(sp.getStringSet("sources", new HashSet<>(Arrays.asList(SOURCE_NXTFRAME))));
+        // Museum packs work out of the box on any TV (they download on first use).
+        return new HashSet<>(sp.getStringSet("sources", new HashSet<>(Arrays.asList(SOURCE_MET, SOURCE_AIC))));
     }
     public void setSources(Set<String> v) { sp.edit().putStringSet("sources", new HashSet<>(v)).apply(); }
 
