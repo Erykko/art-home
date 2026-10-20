@@ -286,6 +286,10 @@ install side by side rather than replacing each other.
 
 ## Building from source
 
+Releases and Google Play uploads are automated with GitHub Actions — see
+[docs/PLAY_STORE.md](docs/PLAY_STORE.md).
+
+
 No Gradle: the APK is built straight from the Android SDK command-line tools.
 `build_release.sh` produces the public release (neutral package name, release key, checks that
 no personal strings are inside).

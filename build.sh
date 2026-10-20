@@ -4,8 +4,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 SDK=${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}
-BT=$SDK/build-tools/36.1.0
-JAR=$SDK/platforms/android-34/android.jar
+BT=$SDK/build-tools/${BUILD_TOOLS:-36.1.0}
+JAR=$SDK/platforms/${PLATFORM:-android-36}/android.jar
 OUT=build
 
 rm -rf "$OUT"
@@ -26,7 +26,7 @@ cp "$OUT/unsigned.apk" "$OUT/with-dex.apk"
 (cd "$OUT/dex" && zip -q -j ../with-dex.apk classes.dex)
 
 "$BT/zipalign" -f -p 4 "$OUT/with-dex.apk" "$OUT/aligned.apk"
-"$BT/apksigner" sign --ks "$HOME/.android/debug.keystore" \
+"$BT/apksigner" sign --ks "${DEBUG_KEYSTORE:-$HOME/.android/debug.keystore}" \
     --ks-pass pass:android --key-pass pass:android \
     --out "$OUT/ArtHome.apk" "$OUT/aligned.apk"
 

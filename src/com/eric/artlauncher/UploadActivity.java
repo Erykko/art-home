@@ -56,8 +56,9 @@ public class UploadActivity extends Activity {
         TextView title = label("Add from your phone", 30, Color.WHITE);
         TextView steps = label("1. Connect your phone to the same Wi-Fi as the TV.\n"
                 + "2. Scan this code with the phone camera.\n"
-                + "3. Choose photos — they appear on Art Home as they arrive.\n\n"
-                + "You can also send a new ArtHome.apk from the same page to update the app.", 16, 0xFFCFD3D8);
+                + "3. Choose photos — they appear on Art Home as they arrive."
+                + (Flavor.PLAY_STORE ? "" : "\n\nYou can also send a new ArtHome.apk from the same page to update the app."),
+                16, 0xFFCFD3D8);
         steps.setLineSpacing(0, 1.3f);
         steps.setPadding(0, dp(16), 0, dp(16));
         TextView url = label("", 15, 0xFF9AA0A6);

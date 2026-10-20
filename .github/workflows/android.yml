@@ -1,26 +1,117 @@
-name: Android CI
+name: Android
+
+# Builds the app on every push / pull request. Tagging a release (vX.Y) also builds the
+# signed sideload APK and Google Play bundle, attaches both to the GitHub release, and uploads
+# the bundle to Google Play (internal testing track by default).
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   RELEASE_KEYSTORE_BASE64     base64 of release.jks
+#   RELEASE_KEY_PASS            password of the keystore and key
+#   PLAY_SERVICE_ACCOUNT_JSON   Google Play service-account JSON key (Play upload only)
+# Optional repository variable:
+#   PLAY_TRACK                  internal (default) · alpha · beta · production
 
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Google Play track"
+        default: "internal"
+        type: choice
+        options: [ internal, alpha, beta, production ]
+
+env:
+  BUILD_TOOLS: "36.0.0"
+  PLATFORM: "android-36"
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-    - name: set up JDK 11
-      uses: actions/setup-java@v4
-      with:
-        java-version: '11'
-        distribution: 'temurin'
-        cache: gradle
+      - uses: actions/checkout@v4
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    - name: Build with Gradle
-      run: ./gradlew build
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools and platform
+        run: sdkmanager "build-tools;${BUILD_TOOLS}" "platforms;${PLATFORM}"
+
+      - name: Build (debug key)
+        run: |
+          mkdir -p ~/.android
+          keytool -genkeypair -keystore ~/.android/debug.keystore -alias androiddebugkey \
+            -storepass android -keypass android -keyalg RSA -validity 10000 -dname "CN=Android Debug"
+          ./build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArtHome-debug
+          path: build/ArtHome.apk
+
+  release:
+    # Tags, or a manual run (to push the current main to Play).
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools, platform and bundletool
+        run: |
+          sdkmanager "build-tools;${BUILD_TOOLS}" "platforms;${PLATFORM}"
+          curl -sL -o "$RUNNER_TEMP/bundletool.jar" \
+            https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
+
+      - name: Restore release key
+        env:
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then echo "::error::RELEASE_KEYSTORE_BASE64 secret is missing"; exit 1; fi
+          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+
+      - name: Build signed APK and Play bundle
+        env:
+          RELEASE_KEYSTORE: ${{ runner.temp }}/release.jks
+          RELEASE_KEY_PASS: ${{ secrets.RELEASE_KEY_PASS }}
+          BUNDLETOOL: ${{ runner.temp }}/bundletool.jar
+        run: ./build_release.sh
+
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "Art Home ${TAG#v}" --generate-notes
+          gh release upload "$TAG" release/*.apk release/*.aab --clobber
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: app.arthome
+          releaseFiles: release/*.aab
+          track: ${{ inputs.track || vars.PLAY_TRACK || 'internal' }}
+          status: ${{ (inputs.track || vars.PLAY_TRACK || 'internal') == 'internal' && 'completed' || 'draft' }}
+
+      - name: Remove release key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

@@ -131,7 +131,7 @@ public final class UploadServer {
                 save(in, length, dest);
                 listener.onPhoto(dest);
                 respond(out, 200, "text/plain", "ok");
-            } else if (method.equals("PUT") && target.startsWith("/apk")) {
+            } else if (method.equals("PUT") && target.startsWith("/apk") && !Flavor.PLAY_STORE) {
                 if (length <= 0 || length > MAX_APK) {
                     respond(out, 413, "text/plain", "Too large");
                     return;
@@ -213,13 +213,13 @@ public final class UploadServer {
             + "</head><body><h1>Art Home</h1><p>Send pictures to the TV. Landscape photos look best.</p>"
             + "<label>Choose photos<input id=p type=file accept='image/*' multiple></label>"
             + "<div id=log></div><hr style='border-color:#333;margin:32px 0'>"
-            + "<small>Update Art Home: choose a new ArtHome.apk</small>"
-            + "<label style='background:#333;color:#eee'>Choose APK<input id=a type=file accept='.apk'></label>"
+            + (Flavor.PLAY_STORE ? "" : "<small>Update Art Home: choose a new ArtHome.apk</small>"
+            + "<label style='background:#333;color:#eee'>Choose APK<input id=a type=file accept='.apk'></label>")
             + "<script>const T='__TOKEN__';const log=m=>document.getElementById('log').textContent+=m+'\\n';"
             + "document.getElementById('p').onchange=async e=>{for(const f of e.target.files){"
             + "log('Sending '+f.name+'…');const r=await fetch('/photo?t='+T+'&name='+encodeURIComponent(f.name),"
             + "{method:'PUT',body:f});log(r.ok?'✓ '+f.name:'✗ '+f.name+' ('+r.status+')');}log('Done.');};"
-            + "document.getElementById('a').onchange=async e=>{const f=e.target.files[0];if(!f)return;"
+            + "const a=document.getElementById('a');if(a)a.onchange=async e=>{const f=e.target.files[0];if(!f)return;"
             + "log('Uploading update…');const r=await fetch('/apk?t='+T,{method:'PUT',body:f});"
             + "log(await r.text());};</script></body></html>";
 }

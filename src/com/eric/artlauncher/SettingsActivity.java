@@ -199,8 +199,12 @@ public class SettingsActivity extends Activity {
                 + "plugged into the TV, then turn on \"My pictures\" in Sources.");
 
         header("About");
-        row("Update Art Home", "Version " + versionName() + " · send a new APK from your phone",
-                () -> startActivity(new android.content.Intent(this, UploadActivity.class)));
+        if (Flavor.PLAY_STORE) {
+            info("Art Home " + versionName() + " · updates come from Google Play.");
+        } else {
+            row("Update Art Home", "Version " + versionName() + " · send a new APK from your phone",
+                    () -> startActivity(new android.content.Intent(this, UploadActivity.class)));
+        }
 
         Style.font(list);
         if (focusIndex >= 0 && focusIndex < list.getChildCount()
