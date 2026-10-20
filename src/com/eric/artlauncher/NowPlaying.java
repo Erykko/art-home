@@ -45,6 +45,8 @@ public final class NowPlaying {
     private final LinearLayout textBox;
     private boolean idle = false;
     private long closedAt = 0;
+    /** App whose card was dismissed with ✕; it stays hidden until that app plays again. */
+    private String dismissedPkg = null;
     /** Re-checks the sessions now and then, so the card can never get stuck hidden or shown. */
     private final Runnable watchdog = new Runnable() {
         @Override
@@ -254,9 +256,15 @@ public final class NowPlaying {
         boolean wasVisible = view.getVisibility() == View.VISIBLE;
         PlaybackState s = controller == null ? null : controller.getPlaybackState();
         MediaMetadata m = controller == null ? null : controller.getMetadata();
-        // After ✕, stay hidden briefly; if the app keeps playing anyway, the card returns.
+        // After ✕ the card stays away until that app actually starts playing again
+        // (apps like Spotify keep a paused session alive instead of closing).
         boolean justClosed = android.os.SystemClock.elapsedRealtime() - closedAt < 3000;
-        boolean show = s != null && !justClosed
+        if (controller != null && controller.getPackageName().equals(dismissedPkg)) {
+            boolean playingAgain = s != null && s.getState() == PlaybackState.STATE_PLAYING && !justClosed;
+            if (playingAgain) dismissedPkg = null;
+        }
+        boolean dismissed = controller != null && controller.getPackageName().equals(dismissedPkg);
+        boolean show = s != null && !justClosed && !dismissed
                 && (s.getState() == PlaybackState.STATE_PLAYING || s.getState() == PlaybackState.STATE_PAUSED
                 || s.getState() == PlaybackState.STATE_BUFFERING);
         if (show) {
@@ -302,6 +310,7 @@ public final class NowPlaying {
     private void stopAndClose() {
         if (controller == null) return;
         final String pkg = controller.getPackageName();
+        dismissedPkg = pkg;
         try {
             controller.getTransportControls().stop();
         } catch (Exception ignored) {
